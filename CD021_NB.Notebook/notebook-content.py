@@ -13,6 +13,9 @@
 
 # Welcome to your new notebook
 # Type here in the cell editor to add code!
+# I'm testing whether GitHub Actoin automation is working correctly.
+# If you can read this in the Workspace (without a manual sync)
+# It's working....
 
 
 # METADATA ********************
