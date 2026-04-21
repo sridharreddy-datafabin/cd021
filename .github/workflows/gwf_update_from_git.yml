@@ -1,0 +1,53 @@
+name: update_from_git
+on: 
+  push:
+    branches:
+      - dev
+
+env: 
+  WorkspaceID: 86af73ec-d895-4245-803a-deaf9a0ab831
+  
+jobs: 
+  Update-Fabric-Workspace-from-Git: 
+    runs-on: windows-latest
+    steps: 
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12' 
+          
+      - name: Install pip & Fabric CLI
+        run: |
+            python -m pip install --upgrade pip
+            pip install ms-fabric-cli==1.1.0
+
+      - name: Authenticate
+        run: |
+            fab auth login -u ${{secrets.SPN_CLIENT_ID}} -p ${{secrets.SPN_CLIENT_SECRET}} --tenant ${{secrets.AZURE_TENANT_ID}} 
+      
+      - name: Get Git Status
+        id: gitstatus
+        shell: pwsh
+        run: |
+          $gitStatusRaw = fab api -X get workspaces/${{env.WorkspaceID}}/git/status
+          $gitStatusRoot = $gitStatusRaw | ConvertFrom-Json
+          $gitStatus = $gitStatusRoot.text
+
+          echo "remoteCommitHash=$($gitStatus.remoteCommitHash)" >> $env:GITHUB_OUTPUT
+          echo "workspaceHead=$($gitStatus.workspaceHead)" >> $env:GITHUB_OUTPUT
+
+      - name: Update Workspace from Git
+        shell: pwsh
+        run: |
+          $body = @{
+            remoteCommitHash = "${{ steps.gitstatus.outputs.remoteCommitHash }}"
+            workspaceHead    = "${{ steps.gitstatus.outputs.workspaceHead }}"
+            options = @{
+              allowOverrideItems = $true
+            }
+          } | ConvertTo-Json -Depth 3
+
+          $body | Out-File -FilePath update_body.json -Encoding utf8
+
+          fab api -X post workspaces/${env:WorkspaceID}/git/updateFromGit -i update_body.json
+
